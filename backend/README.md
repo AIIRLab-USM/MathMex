@@ -1,47 +1,46 @@
-# MathMex Backend
+# OpenSearch/Flask Backend
+### This is a simple Flask backend that provides a REST API for interacting with an OpenSearch cluster.
 
-- This directory contains the backend code for the MathMex web application, built using Flask. 
+## Setup
 
-## Getting Started
-- Follow these steps to setup and run the backend server:
+  - Install the required Python packages:
 
-### 1. Create and Activate a Virtual Environment
+  ``` bash
+  pip install -r requirements.txt
+  ```
+  - Configure the OpenSearch connection:
 
-```sh
-python -m venv venv
-venv\Scripts\activate  #On Windows
-# source venv/bin/activate #On macOS/Linux
-```
+      - In app.py, update the following variables with your OpenSearch cluster details:
+      ``` bash
+      OS_HOST: The hostname or IP address of your OpenSearch cluster.
 
-### 2. Install Dependencies
+      OS_PORT: The port number of your OpenSearch cluster (usually 9200).
 
-```sh
-pip install flask flask-cors
-```
+      OS_USERNAME: The username for authentication.
 
-To save dependencies for future use:
+      OS_PASSWORD: The password for authentication.
+      ```
+## Running the Application
 
-```
-pip freeze > requirements.txt
-```
-
-### 3. Run the Flask Server
-
-```sh
+- To run the Flask application, use the following command:
+``` bash
 python app.py
 ```
-
-The server will start at [http://localhost:5000/](http://localhost:5000/).
-
-## Project Structure 
-    - `app.py` -Main Flask application file. 
-    - `venv/` - Python virtual environment (not included in version control).
-    - `requirements.txt` - List of Python dependencies. 
+The application will be available at http://127.0.0.1:5000.
 
 ## API Endpoints
+``` bash
+GET /health: Checks the health of the OpenSearch cluster.
 
-- `Get /` - Returns a simple greeting to confirm the server is running. 
+POST /index: Creates a new index.
 
-## Contributing 
+    Body: {"index_name": "your_index_name"}
 
-Please follow the main project's contributing guidelines in the root `README.md`.
+POST /document: Adds a new document to an index.
+
+    Body: {"index_name": "your_index_name", "document": {"field1": "value1", "field2": "value2"}}
+
+GET /search: Searches for documents in an index.
+
+    Query Parameters: index_name=your_index_name&q=your_query
+```
