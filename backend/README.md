@@ -1,46 +1,49 @@
-# OpenSearch/Flask Backend
-### This is a simple Flask backend that provides a REST API for interacting with an OpenSearch cluster.
+# MathMex Backend
 
-## Setup
+- This directory contains the backend code for the MathMex web application, built using Flask.
 
-  - Install the required Python packages:
+## Getting Started
 
-  ``` bash
-  pip install -r requirements.txt
-  ```
-  - Configure the OpenSearch connection:
+- Follow these steps to setup and run the backend server:
 
-      - In app.py, update the following variables with your OpenSearch cluster details:
-      ``` bash
-      OS_HOST: The hostname or IP address of your OpenSearch cluster.
+### 1. Create and Activate a Virtual Environment
 
-      OS_PORT: The port number of your OpenSearch cluster (usually 9200).
+```sh
+python -m venv venv
+venv\Scripts\activate  #On Windows
+# source venv/bin/activate #On macOS/Linux
+```
 
-      OS_USERNAME: The username for authentication.
+### 2. Install Dependencies
 
-      OS_PASSWORD: The password for authentication.
-      ```
-## Running the Application
+```sh
+pip install -r requirements.txt
+```
 
-- To run the Flask application, use the following command:
-``` bash
+To save dependencies for future use:
+
+```
+pip freeze > requirements.txt
+```
+
+### 3. Run the Flask Server
+
+```sh
 python app.py
 ```
-The application will be available at http://127.0.0.1:5000.
+
+The server will start at [http://localhost:5001/](http://localhost:5001/).
+
+## Project Structure
+
+    - `app.py` -Main Flask application file.
+    - `venv/` - Python virtual environment (not included in version control).
+    - `requirements.txt` - List of Python dependencies.
 
 ## API Endpoints
-``` bash
-GET /health: Checks the health of the OpenSearch cluster.
 
-POST /index: Creates a new index.
+- `Get /` - Returns a simple greeting to confirm the server is running.
 
-    Body: {"index_name": "your_index_name"}
+## Contributing
 
-POST /document: Adds a new document to an index.
-
-    Body: {"index_name": "your_index_name", "document": {"field1": "value1", "field2": "value2"}}
-
-GET /search: Searches for documents in an index.
-
-    Query Parameters: index_name=your_index_name&q=your_query
-```
+Please follow the main project's contributing guidelines in the root `README.md`.

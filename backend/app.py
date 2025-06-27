@@ -1,64 +1,134 @@
-# Import Flask and CORS libraries
-from flask import Flask, request, jsonify
+# app.py
+# --- Merged Imports ---
+from flask import Flask, jsonify, request
+from opensearchpy import OpenSearch, RequestsHttpConnection
+import warnings
 from flask_cors import CORS
+import saytex
 
-# Create the Flask application instance
+# --- Flask App Initialization & CORS ---
 app = Flask(__name__)
+# Enable Cross-Origin Resource Sharing (CORS) for specified frontend origins
+CORS(app, origins=["https://mathmex.com", "https://www.mathmex.com"])
 
-# Enable Cross-Origin Resource Sharing (CORS) so the frontend (React) can communicate with this backend
-CORS(app)
+# --- OpenSearch Client Configuration ---
+OPENSEARCH_HOST = 'localhost'
+OPENSEARCH_PORT = 9200
+OPENSEARCH_USER = 'public_user'
+OPENSEARCH_PASSWORD = 'ThisIsThePublicUserPassW0rd'
+INDEX_NAME = 'public-articles'
 
-# Route for the root URL
+# Suppress the security warning from using a self-signed cert in development
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+
+def get_opensearch_client():
+    """Initializes and returns the OpenSearch client."""
+    client = OpenSearch(
+        hosts=[{'host': OPENSEARCH_HOST, 'port': OPENSEARCH_PORT}],
+        http_auth=(OPENSEARCH_USER, OPENSEARCH_PASSWORD),
+        use_ssl=True,
+        verify_certs=False,
+        ssl_show_warn=False,
+        connection_class=RequestsHttpConnection
+    )
+    return client
+
+# --- API Endpoints ---
+
 @app.route("/")
 def home():
-    # Display the most recent cleaned LaTeX and function/operator sent to /api/search (if any)
+    """Displays the most recent search terms for debugging purposes."""
     latex = app.config.get("last_latex", None)
     function_latex = app.config.get("last_function_latex", None)
-
-    # Clean the LaTeX for display (replace "\ " with real spaces)
     latex_cleaned = latex.replace("\\ ", " ") if latex else None
     function_latex_cleaned = function_latex.replace("\\ ", " ") if function_latex else None
 
-    msg = "Hello, MathMex!<br>"
+    msg = "Hello, MathMex & OpenSearch Backend!<br>"
     msg += f"Last CLEANED LaTeX string from frontend: <code>{latex_cleaned if latex_cleaned is not None else 'None'}</code><br>"
     msg += f"Last function/operator from frontend: <code>{function_latex_cleaned if function_latex_cleaned is not None else 'None'}</code><br>"
     return msg
 
-@app.route("/api/search", methods=["POST"])
+@app.route("/search", methods=["POST"])
 def search():
+    """
+    Receives a search request, queries OpenSearch, and returns the results.
+    """
     data = request.get_json()
-    latex = data.get("latex", "")  # full LaTeX string from the search bar
-    function_latex = data.get("functionLatex", "")  # LaTeX for function/operator
+    latex_query = data.get("latex", "")
+    function_latex = data.get("functionLatex", "")
 
-    # Store the latest values in app config so they can be shown on the home page
-    app.config["last_latex"] = latex
+    # Store latest values for the home page debugger
+    app.config["last_latex"] = latex_query
     app.config["last_function_latex"] = function_latex
+    
+    print(f"Received search request with LaTeX: {latex_query}")
 
-    # Print the raw string received from the frontend
-    print(f"Raw LaTeX from frontend: {latex!r}")
-    print(f"Raw functionLatex from frontend: {function_latex!r}")
+    if not latex_query:
+        return jsonify({"results": []})
 
-    # Clean only for logging
-    latex_cleaned = latex.replace("\\ ", " ")
-    function_latex_cleaned = function_latex.replace("\\ ", " ")
+    # Initialize the OpenSearch client
+    client = get_opensearch_client()
 
-    print(f"Received search request with LaTeX: {latex_cleaned}")
-    print(f"Received function/operator LaTeX: {function_latex_cleaned}")
-
-    # Always return the functionLatex field, even if it's empty
-    return jsonify({
-        "results": [
-            {
-                "title": "Sample Result",
-                "formula": latex if latex else None,
-                "functionLatex": function_latex,  # Always include, even if empty string
-                "description": "This is a mock result.",
-                "tags": ["example"],
-                "year": "2025"
+    # Construct the OpenSearch Query DSL
+    query_body = {
+        "size": 20,
+        "query": {
+            "multi_match": {
+                "query": latex_query,
+                "fields": ["title", "content"]
             }
-        ]
-    })
+        }
+    }
 
-# Run the Flask development server if this script is executed directly
-if __name__ == "__main__":
-    app.run(debug=True)
+    try:
+        # Execute the search query
+        response = client.search(
+            body=query_body,
+            index=INDEX_NAME
+        )
+        
+        # Format results, adding the functionLatex to each result for the frontend
+        results = []
+        for hit in response['hits']['hits']:
+            result_item = hit['_source']
+            # The 'formula' for display is assumed to be the original query latex
+            result_item['formula'] = latex_query 
+            result_item['functionLatex'] = function_latex 
+            results.append(result_item)
+            
+        return jsonify({"results": results})
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return jsonify({"error": "Could not connect to or search the database."}), 500
+
+
+@app.route('/speech-to-latex', methods=['POST'])
+def speech_to_latex():
+    """Converts a spoken text string into a LaTeX formula."""
+    data = request.get_json()
+    text = data.get('text')
+    if not text:
+        return jsonify({'error': 'No text provided'}), 400
+
+    # Pre-process text to be more SayTeX-friendly
+    replacements = {
+        "plus": "+", "minus": "-", "times": "*", "divided by": "/",
+        "over": "/", "equals": "=", "squared": "^2", "cubed": "^3",
+    }
+    for word, symbol in replacements.items():
+        text = text.replace(symbol, word)
+
+    try:
+        st = saytex.Saytex()
+        latex_string = st.to_latex(text)
+        return jsonify({'latex': latex_string})
+    except Exception as e:
+        print(f"Error during LaTeX conversion: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# --- Main execution block ---
+if __name__ == '__main__':
+    # Use port 5001 to avoid conflicts and run in debug mode for development.
+    app.run(port=5001, debug=True)
+
